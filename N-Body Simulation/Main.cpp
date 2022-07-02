@@ -39,8 +39,8 @@ int main()
 	Particle particle3(sf::Vector2f(5, 0));
 
 	particle1.setVelocity(sf::Vector2f(0,0));
-	particle2.setVelocity(sf::Vector2f(0,0));
-	particle3.setVelocity(sf::Vector2f(0,0));
+	particle2.setVelocity(sf::Vector2f(-1,1));
+	particle3.setVelocity(sf::Vector2f(1,-1));
 
 
 	shape1.setFillColor(sf::Color(250, 10, 10));
@@ -129,7 +129,7 @@ int main()
 		std::cout << "Velocity: " << particle1.getVelocity().y << " ";
 		std::cout << "Position: " << particle1.getPosition().y << " ";
 		std::cout << "Acceleration: " << acceleration(particle1.getPosition(), particle2.getPosition()).y << " ";
-
+		
 		std::cout << std::endl;
 
 
@@ -164,17 +164,17 @@ sf::Vector2f acceleration(sf::Vector2f object1, sf::Vector2f object2) {
 
 	//TODO mass is assumed to be 1
 	// pow is double not gpu friendly?
-	float mass = 10.0f;
+	float mass = 1.0f;
 
 
-	float r = sqrt(pow(object1.x, 2) + pow(object1.y, 2));
+	float r = sqrt(pow(object2.x, 2) + pow(object2.y, 2));
 	
 	float ax = mass *
-		(object2.x - object1.x)  / r + 0.0000001f;
+		(object2.x - object1.x)  / r*r + 0.0001f;
 	float ay = mass *
-		(object2.y - object1.y)  / r + 0.0000001f;
+		(object2.y - object1.y)  / r*r + 0.0001f;
 
-	std::cout << "\n "<< (object2.y - object1.y) << "\n";
+	//std::cout << "\n "<< (object2.y - object1.y) << "\n";
 
 
 	return sf::Vector2f(ax, ay);
