@@ -18,9 +18,30 @@
     <ClCompile Include="Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Barnes_Hut.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ArrayMap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Particle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Barnes_Hut.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SortParts.cpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SortParts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GlobalVariables.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ArrayMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -4,6 +4,11 @@
 
 #include "Particle.h"
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include "Barnes_Hut.h"
+#include "GlobalVariables.h"
+#include "ArrayMap.h"
 
 
 // most performant way to render, use shader to modify texture?
@@ -12,14 +17,24 @@
 
 //temp nbody equation
 sf::Vector2f acceleration(sf::Vector2f object1, sf::Vector2f object2);
-//float G_CONSTANT = 6.67300 * pow(10, -11);
-float G_CONSTANT = 0.0001f;
+sf::Vector2f accelerationSum(Particle particles[], int index);
+
+
+//without barnes hut 300 brings to 69 fps
+//with:
+//add toggle so one can switch?
+// 
+
+
+
+
+//float G_CONSTANT = 0.001f;
 
 int main()
 {
 	int VERTICAL_RESOLUTION = 1080;
 	int HORIZONTAL_RESOLUTION = 1920;
-	float ASPECT_RATIO = 0;
+	float ASPECT_RATIO = 16 / 9;
 	float DELTA = 5.0f / 1000.0f;// 
 	//float DELTA = 1.0f;
 
@@ -28,28 +43,39 @@ int main()
 	sf::RenderWindow window(sf::VideoMode(HORIZONTAL_RESOLUTION, VERTICAL_RESOLUTION), "N-Body Simulation");
 	window.setFramerateLimit(144);
 
-	sf::View camera(sf::Vector2f(0.f, 0.f), sf::Vector2f(300.f, 200.f));
+	sf::View camera(sf::Vector2f(130.0f*1.5, 130.0f*1.5), sf::Vector2f(720.0f, 480.f));
 
-	sf::CircleShape shape1(1.0f);
-	sf::CircleShape shape2(1.0f);
-	sf::CircleShape shape3(1.0f);
+	Particle* particles;
+	//Particle* particlesSorted;
+	sf::CircleShape* circle;
 
-	Particle particle1(sf::Vector2f(0, 1));
-	Particle particle2(sf::Vector2f(-5, 0));
-	Particle particle3(sf::Vector2f(5, 0));
+	particles = new Particle[P_COUNT];
+	//particlesSorted = new Particle[P_COUNT];
+	circle = new sf::CircleShape[P_COUNT];
 
-	particle1.setVelocity(sf::Vector2f(0,0));
-	particle2.setVelocity(sf::Vector2f(-1,1));
-	particle3.setVelocity(sf::Vector2f(1,-1));
+	sortArrayMap arrayMap(particles);
+	quadTree tree(&window);
 
 
-	shape1.setFillColor(sf::Color(250, 10, 10));
-	shape2.setFillColor(sf::Color(10, 250, 10));
-	shape3.setFillColor(sf::Color(10, 10, 250));
+	for (size_t i = 0; i < P_COUNT; i++)
+	{
+		circle[i].setRadius(0.5f);
+		circle[i].setFillColor(sf::Color(255, 0, 0, 255));
+	}
 
-	//shape1.setPosition(sf::Vector2f(20, 60));
-	//shape1.setPosition(sf::Vector2f(40, 70));
-	//shape1.setPosition(sf::Vector2f(60, 80));
+
+	for (size_t i = 0; i < P_COUNT; i++)
+	{
+		particles[i].position =
+			sf::Vector2f(std::rand() % 360 + 20, std::rand() % 360 + 20);
+	}
+
+
+	for (size_t i = 0; i < P_COUNT; i++)
+	{
+		//particles[i].setVelocity(sf::Vector2f(std::rand()%40, std::rand() % 40));
+	}
+	//Tree Build
 
 
 	// run the program as long as the window is open
@@ -57,6 +83,8 @@ int main()
 	bool moveDown = false;
 	bool moveLeft = false;
 	bool moveRight = false;
+	bool zoomIn = false;
+	bool zoomOut = false;
 	while (window.isOpen())
 	{
 		// check all the window's events that were triggered since the last iteration of the loop
@@ -65,22 +93,33 @@ int main()
 		{
 
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
-				camera.move(0.f, -5.f);
+				moveUp = true;
+			else
+				moveUp = false;
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-				camera.move(0.f, 5.f);
+				moveDown = true;
+			else
+				moveDown = false;
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
-				camera.move(-5.f, 0.f);
+				moveLeft = true;
+			else
+				moveLeft = false;
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-				camera.move(5.f, 0.f);
-
+				moveRight = true;
+			else
+				moveRight = false;
 			//std::cout << sf::Event::MouseWheelScrollEvent::delta;
 
 
 			//event.mouseWheelScroll.delta
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
-				camera.zoom(0.95f);
+				zoomOut = true;
+			else
+				zoomOut = false;
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::E))
-				camera.zoom(1.05f);
+				zoomIn = true;
+			else
+				zoomIn = false;
 
 
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
@@ -91,67 +130,80 @@ int main()
 				window.close();
 		}
 
-
-		//particle1.setVelocity(particle1.getVelocity() + DELTA *
-		//	acceleration(particle1.getPosition(), particle2.getPosition()));
-		particle1.setVelocity(particle1.getVelocity() + DELTA* (
-			acceleration(particle1.getPosition(), particle2.getPosition()) +
-			acceleration(particle1.getPosition(), particle3.getPosition()))
-		);
-
-		particle2.setVelocity(particle2.getVelocity() + DELTA * (
-			acceleration(particle2.getPosition(), particle1.getPosition()) +
-			acceleration(particle2.getPosition(), particle3.getPosition()))
-		);
-
-		particle3.setVelocity(particle3.getVelocity() + DELTA * (
-			acceleration(particle3.getPosition(), particle1.getPosition()) +
-			acceleration(particle3.getPosition(), particle2.getPosition()))
-		);
-
-
-
-
-
-
-
-		particle1.setPosition(particle1.getPosition() + DELTA * particle1.getVelocity());
-		particle2.setPosition(particle2.getPosition() + DELTA * particle2.getVelocity());
-		particle3.setPosition(particle3.getPosition() + DELTA * particle3.getVelocity());
-
-		shape1.setPosition(particle1.getPosition());
-		shape2.setPosition(particle2.getPosition());
-		shape3.setPosition(particle3.getPosition());
-
-
-		//shape1.move(sf::Vector2f(10, 10));
-
-		std::cout << "Velocity: " << particle1.getVelocity().y << " ";
-		std::cout << "Position: " << particle1.getPosition().y << " ";
-		std::cout << "Acceleration: " << acceleration(particle1.getPosition(), particle2.getPosition()).y << " ";
-		
-		std::cout << std::endl;
-
-
-
-
-
-
+		if (moveUp)
+			camera.move(0.f, -1.f);
+		if (moveDown)
+			camera.move(0.f, 1.f);
+		if (moveLeft)
+			camera.move(-1.f, 0.f);
+		if (moveRight)
+			camera.move(1.f, 0.f);
+		if (zoomIn)
+			camera.zoom(0.99f);
+		if (zoomOut)
+			camera.zoom(1.01f);
 
 		window.setView(camera);
+		//quadTree* Tree = new quadTree(particles, P_COUNT, sf::Vector2f(0, 0), 150.0f, &window);
 
 
+		//sorting for quad tree building before vel calcs
+		arrayMap.sort();
+		//Build Quad Tree
+		tree.buildNodes(arrayMap.getArrayMap());
+		//get new velocities and modify placement 
+	
+
+
+
+		for (size_t i = 0; i < P_COUNT; i++)
+		{
+			//particles[i].setVelocity(particles[i].getVelocity() + DELTA * accelerationSum(particles, i));
+		}
+
+		//particle3.setVelocity(particle3.getVelocity() + DELTA * (
+		//	acceleration(particle3.getPosition(), particle1.getPosition()) +
+		//	acceleration(particle3.getPosition(), particle2.getPosition()))
+
+
+		for (size_t i = 0; i < P_COUNT; i++)
+		{
+			//setpPosition
+			//particles[i].setpPosition(particles[i].getpPosition() + DELTA * particles[i].getVelocity());
+			//set shape pos
+			//particles[i].setPosition(particles[i].getpPosition());
+		}
+
+
+		//std::cout << particles[1].getVelocity().y <<" \n";
+
+
+
+
+
+		//this is expensive, do using a shader
+		for (size_t i = 0; i < P_COUNT; i++)
+		{
+			circle[i].setPosition(particles[i].position);
+		}
 		//draw particles
-		window.draw(shape1);
-		window.draw(shape2);
-		window.draw(shape3);
+		for (size_t i = 0; i < P_COUNT; i++)
+		{
+			window.draw(circle[i]);
+		}
 
 
 
+
+		///window.draw(circle);
+		//window.draw(test);
 		//displays the frame
 
 		window.display();
 		window.clear();
+		//clear the ArrayMap
+		arrayMap.clear();
+		//delete Tree;
 
 
 
@@ -167,15 +219,48 @@ sf::Vector2f acceleration(sf::Vector2f object1, sf::Vector2f object2) {
 	float mass = 1.0f;
 
 
-	float r = sqrt(pow(object2.x, 2) + pow(object2.y, 2));
-	
+	//float r = pow(object1.x, 2) + pow(object1.y, 2);
+
+
+	sf::Vector2f t;
+	//t.x = object2.x - object1.x;
+	//t.y = object2.y - object1.y;
+	t = object2 - object1;
+
+	//no need sqrt, since we want r^3
+	float r = pow(t.x, 2) + pow(t.y, 2);
+	//r = abs(r * r);
+
+	// add mass for barnes hut
 	float ax = mass *
-		(object2.x - object1.x)  / r*r + 0.0001f;
+		(object2.x - object1.x) / (r + 0.00001f);
 	float ay = mass *
-		(object2.y - object1.y)  / r*r + 0.0001f;
+		(object2.y - object1.y) / (r + 0.00001f);
 
 	//std::cout << "\n "<< (object2.y - object1.y) << "\n";
 
 
 	return sf::Vector2f(ax, ay);
+}
+
+sf::Vector2f accelerationSum(Particle particles[], int index) {
+
+	sf::Vector2f accSum;
+
+
+	for (size_t i = 0; i < P_COUNT; i++)
+	{
+		if (i != index)
+		{
+			//accSum = accSum + acceleration(particles[index].getpPosition(), particles[i].getpPosition());
+		}
+	}
+
+	return accSum;
+
+
+
+
+
+
 }

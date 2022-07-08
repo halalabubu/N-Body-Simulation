@@ -134,10 +134,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ArrayMap.cpp" />
+    <ClCompile Include="Barnes_Hut.cpp" />
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ArrayMap.h" />
+    <ClInclude Include="Barnes_Hut.h" />
+    <ClInclude Include="GlobalVariables.h" />
     <ClInclude Include="Particle.h" />
+    <ClInclude Include="SortParts.cpp" />
+    <ClInclude Include="SortParts.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
