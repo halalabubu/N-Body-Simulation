@@ -1,32 +1,27 @@
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
+#include <SFML/OpenGL.hpp>
 
-#include "Particle.h"
+
+
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
-#include "Barnes_Hut.h"
-#include "GlobalVariables.h"
-#include "ArrayMap.h"
+
+#include "Kernal.cuh"
+
+#include<iostream>
+
+#define WIDTH 1024
+#define HEIGHT 1024
+#define PCOUNT 100
+#define GRIDCOUNT 4096 //2^12
+
+const std::string FRAGLOC = "resource/particles.frag";
 
 
-// most performant way to render, use shader to modify texture?
-// color using Viscosity ??
-
-
-//temp nbody equation
-sf::Vector2f acceleration(sf::Vector2f object1, sf::Vector2f object2);
-sf::Vector2f accelerationSum(Particle particles[], int index);
-
-
-//without barnes hut 300 brings to 69 fps
-//with:
-//add toggle so one can switch?
-// 
-
-
-
+void InitParticles(Particle* particles);
 
 //float G_CONSTANT = 0.001f;
 
@@ -38,45 +33,51 @@ int main()
 	float DELTA = 5.0f / 1000.0f;// 
 	//float DELTA = 1.0f;
 
+	int pixelCount = WIDTH * HEIGHT;
+	const int BLOCKSIZE = 256;
+	const int NUMBLOCKS = (pixelCount + BLOCKSIZE - 1) / BLOCKSIZE;
 
 
-	sf::RenderWindow window(sf::VideoMode(HORIZONTAL_RESOLUTION, VERTICAL_RESOLUTION), "N-Body Simulation");
+	sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "N-Body Simulation");
 	window.setFramerateLimit(144);
 
-	sf::View camera(sf::Vector2f(130.0f*1.5, 130.0f*1.5), sf::Vector2f(720.0f, 480.f));
-
+	//texture
+	sf::Texture texture;
+	sf::Sprite sprite;
+	//texture.loadFromFile("resource/test.png");
+	texture.create(WIDTH, HEIGHT);
+	sprite.setTexture(texture);
+	sprite.setOrigin(sf::Vector2f(0, 0));
+	
+	sf::Shader *shader;
+	sf::Uint8* pixelValues;
 	Particle* particles;
-	//Particle* particlesSorted;
-	sf::CircleShape* circle;
+	Pixel* pixel;
+	Grid* grid;
 
-	particles = new Particle[P_COUNT];
-	//particlesSorted = new Particle[P_COUNT];
-	circle = new sf::CircleShape[P_COUNT];
+	cudaMallocManaged(&shader, sizeof(sf::Shader));
+	cudaMallocManaged(&pixelValues, pixelCount * 4 * sizeof(sf::Uint8));
+	cudaMallocManaged(&particles, PCOUNT * sizeof(Particle));
+	cudaMallocManaged(&pixel, pixelCount * sizeof(Pixel));
+	cudaMallocManaged(&grid, GRIDCOUNT * sizeof(Grid));
 
-	sortArrayMap arrayMap(particles);
-	quadTree tree(&window);
+	//sets the texture to all black 0x00,0x00,0x00,0xFF	RGBA
+	setTextureColor << <NUMBLOCKS, BLOCKSIZE >> > (pixelCount * 4, pixelValues);
+	cudaDeviceSynchronize();
+	texture.update(pixelValues);
+	texture.setSmooth(true);
 
+	//init particle positions
+	InitParticles(particles);
 
-	for (size_t i = 0; i < P_COUNT; i++)
-	{
-		circle[i].setRadius(0.5f);
-		circle[i].setFillColor(sf::Color(255, 0, 0, 255));
-	}
+	//shader declared and now exists on managed memory
+	shader = new sf::Shader;
+	shader->loadFromFile(FRAGLOC,sf::Shader::Fragment);
 
+	
+	
 
-	for (size_t i = 0; i < P_COUNT; i++)
-	{
-		particles[i].position =
-			sf::Vector2f(std::rand() % 360 + 20, std::rand() % 360 + 20);
-	}
-
-
-	for (size_t i = 0; i < P_COUNT; i++)
-	{
-		//particles[i].setVelocity(sf::Vector2f(std::rand()%40, std::rand() % 40));
-	}
-	//Tree Build
-
+	sf::View camera(sf::Vector2f(WIDTH / 2, HEIGHT / 2), sf::Vector2f(WIDTH, HEIGHT));
 
 	// run the program as long as the window is open
 	bool moveUp = false;
@@ -84,7 +85,8 @@ int main()
 	bool moveLeft = false;
 	bool moveRight = false;
 	bool zoomIn = false;
-	bool zoomOut = false;
+	bool zoomOut = false; 
+
 	while (window.isOpen())
 	{
 		// check all the window's events that were triggered since the last iteration of the loop
@@ -129,138 +131,63 @@ int main()
 			if (event.type == sf::Event::Closed)
 				window.close();
 		}
-
-		if (moveUp)
-			camera.move(0.f, -1.f);
-		if (moveDown)
-			camera.move(0.f, 1.f);
-		if (moveLeft)
-			camera.move(-1.f, 0.f);
-		if (moveRight)
-			camera.move(1.f, 0.f);
-		if (zoomIn)
-			camera.zoom(0.99f);
-		if (zoomOut)
-			camera.zoom(1.01f);
-
+		{
+			if (moveUp)
+				camera.move(0.f, -1.f);
+			if (moveDown)
+				camera.move(0.f, 1.f);
+			if (moveLeft)
+				camera.move(-1.f, 0.f);
+			if (moveRight)
+				camera.move(1.f, 0.f);
+			if (zoomIn)
+				camera.zoom(0.99f);
+			if (zoomOut)
+				camera.zoom(1.01f);
+		}
 		window.setView(camera);
-		//quadTree* Tree = new quadTree(particles, P_COUNT, sf::Vector2f(0, 0), 150.0f, &window);
+
+		
 
 
-		//sorting for quad tree building before vel calcs
-		arrayMap.sort();
-		//Build Quad Tree
-		tree.buildNodes(arrayMap.getArrayMap());
-		//get new velocities and modify placement 
-	
+		placeIntoPixel <<<NUMBLOCKS, BLOCKSIZE >> > (PCOUNT, WIDTH, particles, pixel);
+		cudaDeviceSynchronize();
+		updateTexture << <NUMBLOCKS, BLOCKSIZE >> > (pixelCount, pixelValues, pixel);
+		cudaDeviceSynchronize();
+		//texture.update(pixelValues);
 
 
-
-		for (size_t i = 0; i < P_COUNT; i++)
-		{
-			//particles[i].setVelocity(particles[i].getVelocity() + DELTA * accelerationSum(particles, i));
-		}
-
-		//particle3.setVelocity(particle3.getVelocity() + DELTA * (
-		//	acceleration(particle3.getPosition(), particle1.getPosition()) +
-		//	acceleration(particle3.getPosition(), particle2.getPosition()))
-
-
-		for (size_t i = 0; i < P_COUNT; i++)
-		{
-			//setpPosition
-			//particles[i].setpPosition(particles[i].getpPosition() + DELTA * particles[i].getVelocity());
-			//set shape pos
-			//particles[i].setPosition(particles[i].getpPosition());
-		}
-
-
-		//std::cout << particles[1].getVelocity().y <<" \n";
-
-
-
-
-
-		//this is expensive, do using a shader
-		for (size_t i = 0; i < P_COUNT; i++)
-		{
-			circle[i].setPosition(particles[i].position);
-		}
-		//draw particles
-		for (size_t i = 0; i < P_COUNT; i++)
-		{
-			window.draw(circle[i]);
-		}
-
-
-
-
-		///window.draw(circle);
-		//window.draw(test);
-		//displays the frame
+		//window.draw(sprite,shader);
+		window.draw(sprite);
 
 		window.display();
 		window.clear();
-		//clear the ArrayMap
-		arrayMap.clear();
-		//delete Tree;
 
 
 
 	}
 
+
+
+
+
+	cudaFree(pixelValues);
+	cudaFree(particles);
+	cudaFree(pixel);
+	cudaFree(grid);
 	return 0;
 }
+void InitParticles(Particle* particles) {
 
-sf::Vector2f acceleration(sf::Vector2f object1, sf::Vector2f object2) {
-
-	//TODO mass is assumed to be 1
-	// pow is double not gpu friendly?
-	float mass = 1.0f;
-
-
-	//float r = pow(object1.x, 2) + pow(object1.y, 2);
-
-
-	sf::Vector2f t;
-	//t.x = object2.x - object1.x;
-	//t.y = object2.y - object1.y;
-	t = object2 - object1;
-
-	//no need sqrt, since we want r^3
-	float r = pow(t.x, 2) + pow(t.y, 2);
-	//r = abs(r * r);
-
-	// add mass for barnes hut
-	float ax = mass *
-		(object2.x - object1.x) / (r + 0.00001f);
-	float ay = mass *
-		(object2.y - object1.y) / (r + 0.00001f);
-
-	//std::cout << "\n "<< (object2.y - object1.y) << "\n";
-
-
-	return sf::Vector2f(ax, ay);
-}
-
-sf::Vector2f accelerationSum(Particle particles[], int index) {
-
-	sf::Vector2f accSum;
-
-
-	for (size_t i = 0; i < P_COUNT; i++)
+	for (size_t i = 0; i < PCOUNT; i++)
 	{
-		if (i != index)
-		{
-			//accSum = accSum + acceleration(particles[index].getpPosition(), particles[i].getpPosition());
-		}
+		particles[i].mass = 1;
+		particles[i].velocity.x = 0;
+		particles[i].velocity.y = 0;
+
+		particles[i].pos.x = rand() % (WIDTH - 40) + 20;
+		particles[i].pos.y = rand() % (HEIGHT - 40) + 20;
 	}
-
-	return accSum;
-
-
-
-
 
 
 }
