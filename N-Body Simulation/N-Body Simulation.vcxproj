@@ -112,10 +112,11 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\Users\Bum\Desktop\N-Body Simulation\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>sfml-graphics-d.lib;sfml-window-d.lib;sfml-audio-d.lib;sfml-network-d.lib;sfml-system-d.lib;cudart.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sfml-graphics-d.lib;sfml-window-d.lib;sfml-audio-d.lib;sfml-network-d.lib;sfml-system-d.lib;cudart.lib;cudadevrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

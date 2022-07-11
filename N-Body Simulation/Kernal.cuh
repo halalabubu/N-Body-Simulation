@@ -7,43 +7,56 @@
 #include <SFML/System.hpp>
 #include <curand.h>
 
+
+struct Node
+{
+	int startIndex;
+	int endIndex;
+	float2 com;
+	float totalMass;
+
+	float2 mins;
+	float width;
+
+	Node *quadrants[4];
+};
+
+struct NodeList {
+	Node level0;
+	Node level1[4];
+	Node level2[16];
+	Node level3[64];
+	Node level4[256];
+	Node level5[1024];
+	Node level6[4096];
+	Node level7[16384];
+	Node level8[65536];
+};
+
+
+
+
 struct Particle
 {
 	float mass;
 	float2 pos;
 	float2 velocity;
 };
+
+
+
+
 //each pixel is given a struct that contains allparticles within its bounds
-struct Pixel {
-	float totalMass = 0;
-	Particle* particles = nullptr;
-};
-struct Grid {
-	float totalMass;
-	float2 com;
-};
+
+
+
 
 
 //set all pixels to this color
 __global__ void setTextureColor(int n, sf::Uint8* pixels);
+__global__ void buildTree(
+	Particle* particles,Node* node,NodeList *nodeList, int currentLevel, int levels, float width, float xmin, float ymin);
 
-
-//init particle values, then place into array
-//__global__ void initParticles(int n, sf::Uint8* pixels);
-
-//calculate acceleration and adjust velocity
-//__global__ void calcAccel(int n, sf::Uint8* pixels);
-
-//adjust position
-//__global__ void calcPos(int n, sf::Uint8* pixels);
-
-//place particles into array
-__global__ void placeIntoPixel(int n, int pixelLength, Particle* particle, Pixel* pixel);
-//place particles into array
-__global__ void placeIntoGrid(int n, int gridLength, float gridSize, Particle* particle, Grid* grid);
-
-//update pixels
-__global__ void updateTexture(int n, sf::Uint8* pixels, Pixel* pixel);
 
 
 

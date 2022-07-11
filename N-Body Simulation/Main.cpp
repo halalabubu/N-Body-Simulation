@@ -4,7 +4,6 @@
 #include <SFML/OpenGL.hpp>
 
 
-
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
@@ -15,22 +14,28 @@
 
 #define WIDTH 1024
 #define HEIGHT 1024
-#define PCOUNT 100
+#define PCOUNT 2000
 #define GRIDCOUNT 4096 //2^12
 
+const float GRIDSIZE = 1024;
+const int LEVELS = 6;
+const int CURRENT_LEVEL = 0;
 const std::string FRAGLOC = "resource/particles.frag";
 
 
 void InitParticles(Particle* particles);
+void drawGrid(Node* node, sf::RenderWindow& window);
+void buildTreeConnection(NodeList* nList);
 
 //float G_CONSTANT = 0.001f;
 
-int main()
+__host__ int main()
 {
 	int VERTICAL_RESOLUTION = 1080;
 	int HORIZONTAL_RESOLUTION = 1920;
 	float ASPECT_RATIO = 16 / 9;
 	float DELTA = 5.0f / 1000.0f;// 
+	bool debugGrid = true;
 	//float DELTA = 1.0f;
 
 	int pixelCount = WIDTH * HEIGHT;
@@ -48,34 +53,63 @@ int main()
 	texture.create(WIDTH, HEIGHT);
 	sprite.setTexture(texture);
 	sprite.setOrigin(sf::Vector2f(0, 0));
-	
-	sf::Shader *shader;
-	sf::Uint8* pixelValues;
+
 	Particle* particles;
-	Pixel* pixel;
-	Grid* grid;
+	//Node* node;
+	NodeList* nList;
 
-	cudaMallocManaged(&shader, sizeof(sf::Shader));
-	cudaMallocManaged(&pixelValues, pixelCount * 4 * sizeof(sf::Uint8));
 	cudaMallocManaged(&particles, PCOUNT * sizeof(Particle));
-	cudaMallocManaged(&pixel, pixelCount * sizeof(Pixel));
-	cudaMallocManaged(&grid, GRIDCOUNT * sizeof(Grid));
+	//cudaMallocManaged(&node, sizeof(Node));
+	cudaMallocManaged(&nList, sizeof(NodeList));
 
-	//sets the texture to all black 0x00,0x00,0x00,0xFF	RGBA
-	setTextureColor << <NUMBLOCKS, BLOCKSIZE >> > (pixelCount * 4, pixelValues);
-	cudaDeviceSynchronize();
-	texture.update(pixelValues);
-	texture.setSmooth(true);
+
+	//node = new Node;
+	nList->level0.startIndex = 0;
+	nList->level0.endIndex = PCOUNT - 1;
+
 
 	//init particle positions
 	InitParticles(particles);
 
 	//shader declared and now exists on managed memory
-	shader = new sf::Shader;
-	shader->loadFromFile(FRAGLOC,sf::Shader::Fragment);
+	//shader = new sf::Shader;
+	//shader->loadFromFile(FRAGLOC,sf::Shader::Fragment);
 
-	
-	
+
+	sf::VertexArray triangles(sf::Points, PCOUNT);
+	for (size_t i = 0; i < PCOUNT; i++)
+	{
+		triangles[i].color = sf::Color::Red;
+	}
+
+
+	//for (size_t i = 0; i < PCOUNT; i+=3)
+	//{
+	//	int demo = rand() % WIDTH;
+	//	int demo2 = rand() % WIDTH;
+	//	triangles[i].position = sf::Vector2f(0+demo, 0 + demo2);
+	//}
+
+	buildTreeConnection(nList);
+
+
+	int he;
+	he = 1;
+	he = 1;
+	he = 1;
+
+
+	buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
+	cudaDeviceSynchronize();
+	std::cout << nList->level0.totalMass;
+
+	//buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
+	//cudaDeviceSynchronize();
+	//for (size_t i = 0; i < PCOUNT; i++)
+	//{
+	//	std::cout << "Y Value: " << particles[i].pos.y << std::endl;
+	//}
+
 
 	sf::View camera(sf::Vector2f(WIDTH / 2, HEIGHT / 2), sf::Vector2f(WIDTH, HEIGHT));
 
@@ -85,7 +119,11 @@ int main()
 	bool moveLeft = false;
 	bool moveRight = false;
 	bool zoomIn = false;
-	bool zoomOut = false; 
+	bool zoomOut = false;
+
+
+
+
 
 	while (window.isOpen())
 	{
@@ -147,19 +185,47 @@ int main()
 		}
 		window.setView(camera);
 
-		
 
 
-		placeIntoPixel <<<NUMBLOCKS, BLOCKSIZE >> > (PCOUNT, WIDTH, particles, pixel);
-		cudaDeviceSynchronize();
-		updateTexture << <NUMBLOCKS, BLOCKSIZE >> > (pixelCount, pixelValues, pixel);
-		cudaDeviceSynchronize();
+
+		//placeIntoPixel <<<NUMBLOCKS, BLOCKSIZE >> > (PCOUNT, WIDTH, particles, pixel);
+		//cudaDeviceSynchronize();
+		//updateTexture << <NUMBLOCKS, BLOCKSIZE >> > (pixelCount, pixelValues, pixel);
+		//cudaDeviceSynchronize();
 		//texture.update(pixelValues);
+		for (size_t i = 0; i < PCOUNT; i++)
+		{
+			triangles[i].position.x = particles[i].pos.x;
+			triangles[i].position.y = particles[i].pos.y;
+		}
+		buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
+		cudaDeviceSynchronize();
+		if (debugGrid)
+		{
+			drawGrid(&nList->level0, window);
+			for (size_t i = 0; i < pow(4, 1); i++)
+				drawGrid(&nList->level1[i], window);
+			for (size_t i = 0; i < pow(4, 2); i++)
+				drawGrid(&nList->level2[i], window);
+			for (size_t i = 0; i < pow(4, 3); i++)
+				drawGrid(&nList->level3[i], window);
+			for (size_t i = 0; i < pow(4, 4); i++)
+				drawGrid(&nList->level4[i], window);
+			for (size_t i = 0; i < pow(4, 5); i++)
+				drawGrid(&nList->level5[i], window);
+			for (size_t i = 0; i < pow(4, 6); i++)
+				drawGrid(&nList->level6[i], window);
+
+
+		}
+
+
+
 
 
 		//window.draw(sprite,shader);
-		window.draw(sprite);
-
+		//window.draw(sprite);
+		window.draw(triangles);
 		window.display();
 		window.clear();
 
@@ -170,11 +236,9 @@ int main()
 
 
 
-
-	cudaFree(pixelValues);
+	cudaFree(nList);
 	cudaFree(particles);
-	cudaFree(pixel);
-	cudaFree(grid);
+
 	return 0;
 }
 void InitParticles(Particle* particles) {
@@ -189,5 +253,91 @@ void InitParticles(Particle* particles) {
 		particles[i].pos.y = rand() % (HEIGHT - 40) + 20;
 	}
 
+
+}
+
+__host__ void drawGrid(Node* node, sf::RenderWindow& window) {
+
+
+
+
+	if (node->totalMass == 0)
+		return;
+
+
+	sf::Vertex line[4];
+	line[0].position = sf::Vector2f(node->mins.x + node->width / 2, node->mins.y);
+	line[1].position = sf::Vector2f(node->mins.x + node->width / 2, node->mins.y + node->width);
+
+	line[2].position = sf::Vector2f(node->mins.x, node->mins.y + +node->width / 2);
+	line[3].position = sf::Vector2f(node->mins.x + node->width, node->mins.y + +node->width / 2);
+
+	window.draw(line, 4, sf::Lines);
+	//for (size_t i = 0; i < 4; i++)
+	//{
+	//	if (node->quadrants[i]->totalMass != 0)
+	//	{
+	//		drawGrid(node->quadrants[i], window);
+	//	}
+	//}
+
+
+
+
+}
+// not nec but makes the tree way easier to work with
+void buildTreeConnection(NodeList* nList) {
+
+	int currentLevel = 1;
+
+	for (size_t i = 0; i < pow(4, currentLevel); i++)
+	{
+		nList->level0.quadrants[i] = &nList->level1[i];
+	}
+	currentLevel++;
+	for (size_t j = 0; j < pow(4, currentLevel); j++)
+	{
+
+		for (size_t i = 0; i < 4; i++)
+		{
+			nList->level1[j].quadrants[i] = &nList->level2[j * 4 + i];
+		}
+	}
+	currentLevel++;
+	for (size_t j = 0; j < pow(4, currentLevel); j++)
+	{
+
+		for (size_t i = 0; i < 4; i++)
+		{
+			nList->level2[j].quadrants[i] = &nList->level3[j * 4 + i];
+		}
+	}
+	currentLevel++;
+	for (size_t j = 0; j < pow(4, currentLevel); j++)
+	{
+
+		for (size_t i = 0; i < 4; i++)
+		{
+			nList->level3[j].quadrants[i] = &nList->level4[j * 4 + i];
+		}
+	}
+	currentLevel++;
+	for (size_t j = 0; j < pow(4, currentLevel); j++)
+	{
+
+		for (size_t i = 0; i < 4; i++)
+		{
+			nList->level4[j].quadrants[i] = &nList->level5[j * 4 + i];
+		}
+	}
+	currentLevel++;
+	for (size_t j = 0; j < pow(4, currentLevel); j++)
+	{
+
+		for (size_t i = 0; i < 4; i++)
+		{
+			nList->level5[j].quadrants[i] = &nList->level6[j * 4 + i];
+		}
+	}
 
 }
