@@ -12,11 +12,14 @@
 
 #include<iostream>
 
+
+
 #define WIDTH 1024
 #define HEIGHT 1024
-#define PCOUNT 2000
+#define PCOUNT 200
 #define GRIDCOUNT 4096 //2^12
 
+__managed__ float DELTA = 5.0f / 100000.0f;
 const float GRIDSIZE = 1024;
 const int LEVELS = 6;
 const int CURRENT_LEVEL = 0;
@@ -61,6 +64,7 @@ __host__ int main()
 	cudaMallocManaged(&particles, PCOUNT * sizeof(Particle));
 	//cudaMallocManaged(&node, sizeof(Node));
 	cudaMallocManaged(&nList, sizeof(NodeList));
+	cudaMallocManaged(&nList, sizeof(NodeList));
 
 
 	//node = new Node;
@@ -98,11 +102,13 @@ __host__ int main()
 	he = 1;
 	he = 1;
 
+	//let values propagate
+	for (size_t i = 0; i < 6; i++)
+		buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
 
-	buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
 	cudaDeviceSynchronize();
 	std::cout << nList->level0.totalMass;
-
+	std::cout << std::endl;
 	//buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
 	//cudaDeviceSynchronize();
 	//for (size_t i = 0; i < PCOUNT; i++)
@@ -216,11 +222,12 @@ __host__ int main()
 			for (size_t i = 0; i < pow(4, 6); i++)
 				drawGrid(&nList->level6[i], window);
 
-
+			//std::cout << particles[0].velocity.x << "	" << particles[0].velocity.y;
+			//std::cout << std::endl;
 		}
 
-
-
+		setVelSetPos<<<4,256>>>(particles,nList, DELTA);
+		cudaDeviceSynchronize();
 
 
 		//window.draw(sprite,shader);
@@ -260,8 +267,8 @@ __host__ void drawGrid(Node* node, sf::RenderWindow& window) {
 
 
 
-
-	if (node->totalMass == 0)
+	//hard coded in kernal.cu FIX, line 22
+	if (node->totalMass < 10)
 		return;
 
 
@@ -288,31 +295,51 @@ __host__ void drawGrid(Node* node, sf::RenderWindow& window) {
 // not nec but makes the tree way easier to work with
 void buildTreeConnection(NodeList* nList) {
 
+	nList->level0.parent = nullptr;
+	for (size_t j = 0; j < 4; j++)
+		nList->level1[j].parent = &nList->level0;
+	for (size_t j = 0; j < pow(4, 2); j += 4)
+		for (size_t i = 0; i < 4; i++)
+			nList->level2[j + i].parent = &nList->level1[i];
+	for (size_t j = 0; j < pow(4, 3); j += 4)
+		for (size_t i = 0; i < 4; i++)
+			nList->level3[j + i].parent = &nList->level2[i];
+	for (size_t j = 0; j < pow(4, 4); j += 4)
+		for (size_t i = 0; i < 4; i++)
+			nList->level4[j + i].parent = &nList->level3[i];
+	for (size_t j = 0; j < pow(4, 5); j += 4)
+		for (size_t i = 0; i < 4; i++)
+			nList->level5[j + i].parent = &nList->level4[i];
+	for (size_t j = 0; j < pow(4, 6); j += 4)
+		for (size_t i = 0; i < 4; i++)
+			nList->level6[j + i].parent = &nList->level5[i];
+
+
+	//level 1
 	int currentLevel = 1;
-
 	for (size_t i = 0; i < pow(4, currentLevel); i++)
-	{
 		nList->level0.quadrants[i] = &nList->level1[i];
-	}
-	currentLevel++;
-	for (size_t j = 0; j < pow(4, currentLevel); j++)
-	{
 
+
+	currentLevel++;
+	//level 2
+
+	for (size_t j = 0; j < pow(4, currentLevel); j++)
 		for (size_t i = 0; i < 4; i++)
-		{
 			nList->level1[j].quadrants[i] = &nList->level2[j * 4 + i];
-		}
-	}
-	currentLevel++;
-	for (size_t j = 0; j < pow(4, currentLevel); j++)
-	{
 
-		for (size_t i = 0; i < 4; i++)
-		{
-			nList->level2[j].quadrants[i] = &nList->level3[j * 4 + i];
-		}
-	}
+
 	currentLevel++;
+	//level 3
+	for (size_t j = 0; j < pow(4, currentLevel); j++)
+		for (size_t i = 0; i < 4; i++)
+			nList->level2[j].quadrants[i] = &nList->level3[j * 4 + i];
+
+
+
+
+	currentLevel++;
+	//level 4
 	for (size_t j = 0; j < pow(4, currentLevel); j++)
 	{
 
@@ -322,6 +349,7 @@ void buildTreeConnection(NodeList* nList) {
 		}
 	}
 	currentLevel++;
+	//level 5
 	for (size_t j = 0; j < pow(4, currentLevel); j++)
 	{
 
@@ -331,6 +359,7 @@ void buildTreeConnection(NodeList* nList) {
 		}
 	}
 	currentLevel++;
+	//level 6
 	for (size_t j = 0; j < pow(4, currentLevel); j++)
 	{
 

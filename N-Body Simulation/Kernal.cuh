@@ -1,5 +1,6 @@
 #ifndef __KERNAL
 #define __KERNAL
+#pragma once
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -7,18 +8,21 @@
 #include <SFML/System.hpp>
 #include <curand.h>
 
+//__managed__ float MaxDist = 100;
+//__managed__ float DampValue = 0.00001;
 
 struct Node
 {
 	int startIndex;
 	int endIndex;
 	float2 com;
-	float totalMass;
+	float totalMass = 0;
 
 	float2 mins;
 	float width;
-
+	Node* parent;
 	Node *quadrants[4];
+	bool isLeaf = false;
 };
 
 struct NodeList {
@@ -41,6 +45,7 @@ struct Particle
 	float mass;
 	float2 pos;
 	float2 velocity;
+	Node* node;
 };
 
 
@@ -56,7 +61,7 @@ struct Particle
 __global__ void setTextureColor(int n, sf::Uint8* pixels);
 __global__ void buildTree(
 	Particle* particles,Node* node,NodeList *nodeList, int currentLevel, int levels, float width, float xmin, float ymin);
-
+__global__ void setVelSetPos(Particle* particles, NodeList* nlist, float delta);
 
 
 
