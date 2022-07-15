@@ -42,7 +42,7 @@ struct NodeList {
 
 struct Particle
 {
-	float mass;
+	float mass = 0;
 	float2 pos;
 	float2 velocity;
 	Node* node;

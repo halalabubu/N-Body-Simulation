@@ -16,17 +16,18 @@
 
 #define WIDTH 1024
 #define HEIGHT 1024
-#define PCOUNT 200
+#define PCOUNT 600
 #define GRIDCOUNT 4096 //2^12
 
-__managed__ float DELTA = 5.0f / 100000.0f;
+__managed__ float DELTA = 5.0f / 100000000000.0f;
 const float GRIDSIZE = 1024;
 const int LEVELS = 6;
 const int CURRENT_LEVEL = 0;
 const std::string FRAGLOC = "resource/particles.frag";
-
+int calculationMode = 1;//0 is barnes hut, 1 is naive
 
 void InitParticles(Particle* particles);
+void uniformParticles(Particle* particles);
 void drawGrid(Node* node, sf::RenderWindow& window);
 void buildTreeConnection(NodeList* nList);
 
@@ -63,7 +64,7 @@ __host__ int main()
 
 	cudaMallocManaged(&particles, PCOUNT * sizeof(Particle));
 	//cudaMallocManaged(&node, sizeof(Node));
-	cudaMallocManaged(&nList, sizeof(NodeList));
+	//cudaMallocManaged(&nList, sizeof(NodeList));
 	cudaMallocManaged(&nList, sizeof(NodeList));
 
 
@@ -74,6 +75,7 @@ __host__ int main()
 
 	//init particle positions
 	InitParticles(particles);
+	//uniformParticles(particles);
 
 	//shader declared and now exists on managed memory
 	//shader = new sf::Shader;
@@ -83,7 +85,7 @@ __host__ int main()
 	sf::VertexArray triangles(sf::Points, PCOUNT);
 	for (size_t i = 0; i < PCOUNT; i++)
 	{
-		triangles[i].color = sf::Color::Red;
+		triangles[i].color = sf::Color::White;
 	}
 
 
@@ -226,7 +228,7 @@ __host__ int main()
 			//std::cout << std::endl;
 		}
 
-		setVelSetPos<<<4,256>>>(particles,nList, DELTA);
+		setVelSetPos << <80, 128 >> > (particles, nList, DELTA);
 		cudaDeviceSynchronize();
 
 
@@ -255,12 +257,19 @@ void InitParticles(Particle* particles) {
 		particles[i].mass = 1;
 		particles[i].velocity.x = 0;
 		particles[i].velocity.y = 0;
+		int randint = rand() % 1000;
+		float decimal = randint / 1000.0f;
 
-		particles[i].pos.x = rand() % (WIDTH - 40) + 20;
-		particles[i].pos.y = rand() % (HEIGHT - 40) + 20;
+		particles[i].pos.x = rand() % (WIDTH - 500) + decimal + 250;
+		particles[i].pos.y = rand() % (HEIGHT - 500) + decimal + 250;
 	}
 
-
+	//particles[0].mass = 1;
+	//particles[0].pos.x = 400;
+	//particles[0].pos.y = 400;
+	//particles[1].mass = 1;
+	//particles[1].pos.x = 410;
+	//particles[1].pos.y = 400;
 }
 
 __host__ void drawGrid(Node* node, sf::RenderWindow& window) {
@@ -368,5 +377,34 @@ void buildTreeConnection(NodeList* nList) {
 			nList->level5[j].quadrants[i] = &nList->level6[j * 4 + i];
 		}
 	}
+
+}
+
+
+void uniformParticles(Particle* particles)
+{
+	float length = sqrt(1000);
+	int plength = sqrt(PCOUNT);
+	float pSpace = 900 / plength;
+	
+
+	for (size_t i = 0; i < plength; i++)
+	{
+		for (size_t j = 0; j < plength+1; j++)
+		{
+			if (i + j * plength > PCOUNT)
+				return;
+
+			particles[i+j*plength].pos.x = i*pSpace+20;
+			particles[i+j*plength].pos.y = j*pSpace+20;
+		}
+
+	}
+	for (size_t i = 0; i < PCOUNT; i++)
+	{
+		particles[PCOUNT].velocity.x = 0;
+		particles[PCOUNT].velocity.y = 0;
+	}
+
 
 }

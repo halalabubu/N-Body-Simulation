@@ -235,13 +235,13 @@ __global__ void buildTree(
 
 // we dont need to sqrt since the accel form requires r^2 (2D)
 __device__ float getDistance(float2& a, float2& b) {
-	return  abs(b.x - a.x) + abs(b.y - a.y);
+	return  pow(b.x - a.x, 2) + pow(b.y - a.y, 2);
 }
 __device__ float2 getAccel(float2& a, float2& b, float& mass) {
 	float2 accel;
 	float dist = getDistance(a, b);
-	accel.x = mass * (a.x - b.x) / (dist + 0.00001);
-	accel.y = mass * (a.y - b.y) / (dist + 0.00001);
+	accel.x = mass * (b.x - a.x) / (dist + 0.00001f);
+	accel.y = mass * (b.y - a.y) / (dist + 0.00001f);
 
 	return  accel;
 }
@@ -249,11 +249,16 @@ __device__ float2 getAccel(float2& a, float2& b, float& mass) {
 __device__ float2 getallAccel(float2& pPos, Node* node, Particle* particles)
 {
 	float2 accel, temp;
+	accel.x = 0.0f;
+	accel.y = 0.0f;
 	for (size_t i = node->startIndex; i <= node->endIndex; i++)
 	{
-		temp = getAccel(pPos, particles[i].pos, particles[i].mass);
-		accel.x += temp.x;
-		accel.y += temp.y;
+
+			temp = getAccel(pPos, particles[i].pos, particles[i].mass);
+			accel.x += temp.x;
+			accel.y += temp.y;
+		
+
 	}
 
 	return accel;
@@ -272,15 +277,15 @@ __device__ float2 checkChildren(float2& pPos, Node* currentNode, Particle* parti
 		if (currentNode->quadrants[i]->totalMass > 0)
 		{
 			float dist = getDistance(pPos, currentNode->quadrants[i]->com);
-			if (dist > 100)
+			if (dist > 22500)
 			{
-				temp = getAccel(pPos, currentNode->quadrants[i]->com, currentNode->totalMass);
+				temp = getAccel(pPos, currentNode->quadrants[i]->com, currentNode->quadrants[i]->totalMass);
 				accel.x += temp.x;
 				accel.y += temp.y;
 			}
-			else if (currentNode->isLeaf == true)
+			else if (currentNode->quadrants[i]->isLeaf == true)
 			{
-				temp = getallAccel(pPos, currentNode, particles);
+				temp = getallAccel(pPos, currentNode->quadrants[i], particles);
 				accel.x += temp.x;
 				accel.y += temp.y;
 			}
@@ -312,7 +317,7 @@ __device__ float2 traverseNode(float2& pPos, Node* currentNode, Particle* partic
 	accel.y += temp.y;
 
 
-	while (currentNode->parent != currentNode->parent)
+	while (currentNode->parent != nullptr)
 	{
 		//move up
 		//traverseNode(pPos, currentNode->parent, currentNode);
@@ -321,9 +326,13 @@ __device__ float2 traverseNode(float2& pPos, Node* currentNode, Particle* partic
 		//look at children
 		for (size_t i = 0; i < 4; i++)
 		{
-			temp = checkChildren(pPos, currentNode->quadrants[i], particles);
-			accel.x += temp.x;
-			accel.y += temp.y;
+			if (currentNode->quadrants[i] != prevNode)
+			{
+				temp = checkChildren(pPos, currentNode->quadrants[i], particles);
+				accel.x += temp.x;
+				accel.y += temp.y;
+			}
+
 		}
 
 
@@ -341,10 +350,10 @@ __global__ void setVelSetPos(Particle* particles, NodeList* nlist, float delta) 
 	for (int i = index; i <= nlist->level0.endIndex; i += stride)
 	{
 		temp = traverseNode(particles[i].pos, particles[i].node, particles);
-		particles[i].velocity.x += temp.x;
-		particles[i].velocity.y += temp.y;
-		particles[i].pos.x = particles[i].pos.x + delta *particles[i].velocity.x;
-		particles[i].pos.y = particles[i].pos.y + delta *particles[i].velocity.y;
+		particles[i].velocity.x = particles[i].velocity.x + 0.05f * temp.x;
+		particles[i].velocity.y = particles[i].velocity.y + 0.05f * temp.y;
+		particles[i].pos.x = particles[i].pos.x + particles[i].velocity.x;
+		particles[i].pos.y = particles[i].pos.y + particles[i].velocity.y;
 	}
 
 
