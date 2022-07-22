@@ -16,7 +16,7 @@
 
 #define WIDTH 1024
 #define HEIGHT 1024
-#define PCOUNT 600
+#define PCOUNT 200
 #define GRIDCOUNT 4096 //2^12
 
 __managed__ float DELTA = 5.0f / 100000000000.0f;
@@ -25,6 +25,7 @@ const int LEVELS = 6;
 const int CURRENT_LEVEL = 0;
 const std::string FRAGLOC = "resource/particles.frag";
 int calculationMode = 1;//0 is barnes hut, 1 is naive
+bool debugGrid = false;
 
 void InitParticles(Particle* particles);
 void uniformParticles(Particle* particles);
@@ -39,7 +40,7 @@ __host__ int main()
 	int HORIZONTAL_RESOLUTION = 1920;
 	float ASPECT_RATIO = 16 / 9;
 	float DELTA = 5.0f / 1000.0f;// 
-	bool debugGrid = true;
+	
 	//float DELTA = 1.0f;
 
 	int pixelCount = WIDTH * HEIGHT;
@@ -105,12 +106,12 @@ __host__ int main()
 	he = 1;
 
 	//let values propagate
-	for (size_t i = 0; i < 6; i++)
-		buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
+	//for (size_t i = 0; i < 6; i++)
+		//buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
 
-	cudaDeviceSynchronize();
-	std::cout << nList->level0.totalMass;
-	std::cout << std::endl;
+	//cudaDeviceSynchronize();
+	//std::cout << nList->level0.totalMass;
+	//std::cout << std::endl;
 	//buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
 	//cudaDeviceSynchronize();
 	//for (size_t i = 0; i < PCOUNT; i++)
@@ -201,13 +202,26 @@ __host__ int main()
 		//updateTexture << <NUMBLOCKS, BLOCKSIZE >> > (pixelCount, pixelValues, pixel);
 		//cudaDeviceSynchronize();
 		//texture.update(pixelValues);
+
+
+		if (calculationMode == 0)
+		{
+			buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
+			cudaDeviceSynchronize();
+		}
+		else if (calculationMode == 1)
+		{
+			naiveAccel << <80, 128 >> > (PCOUNT,particles);
+			cudaDeviceSynchronize();
+		}
+
 		for (size_t i = 0; i < PCOUNT; i++)
 		{
 			triangles[i].position.x = particles[i].pos.x;
 			triangles[i].position.y = particles[i].pos.y;
 		}
-		buildTree << <1, 1 >> > (particles, &nList->level0, nList, CURRENT_LEVEL, LEVELS, GRIDSIZE, 0, 0);
-		cudaDeviceSynchronize();
+
+
 		if (debugGrid)
 		{
 			drawGrid(&nList->level0, window);
@@ -228,8 +242,8 @@ __host__ int main()
 			//std::cout << std::endl;
 		}
 
-		setVelSetPos << <80, 128 >> > (particles, nList, DELTA);
-		cudaDeviceSynchronize();
+		//setVelSetPos << <80, 128 >> > (particles, nList, DELTA);
+		//cudaDeviceSynchronize();
 
 
 		//window.draw(sprite,shader);
@@ -386,17 +400,17 @@ void uniformParticles(Particle* particles)
 	float length = sqrt(1000);
 	int plength = sqrt(PCOUNT);
 	float pSpace = 900 / plength;
-	
+
 
 	for (size_t i = 0; i < plength; i++)
 	{
-		for (size_t j = 0; j < plength+1; j++)
+		for (size_t j = 0; j < plength + 1; j++)
 		{
 			if (i + j * plength > PCOUNT)
 				return;
 
-			particles[i+j*plength].pos.x = i*pSpace+20;
-			particles[i+j*plength].pos.y = j*pSpace+20;
+			particles[i + j * plength].pos.x = i * pSpace + 20;
+			particles[i + j * plength].pos.y = j * pSpace + 20;
 		}
 
 	}

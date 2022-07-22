@@ -62,7 +62,7 @@ __global__ void setTextureColor(int n, sf::Uint8* pixels);
 __global__ void buildTree(
 	Particle* particles,Node* node,NodeList *nodeList, int currentLevel, int levels, float width, float xmin, float ymin);
 __global__ void setVelSetPos(Particle* particles, NodeList* nlist, float delta);
-
+__global__ void naiveAccel(int n, Particle* particles);
 
 
 

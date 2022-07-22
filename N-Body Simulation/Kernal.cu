@@ -240,8 +240,8 @@ __device__ float getDistance(float2& a, float2& b) {
 __device__ float2 getAccel(float2& a, float2& b, float& mass) {
 	float2 accel;
 	float dist = getDistance(a, b);
-	accel.x = mass * (b.x - a.x) / (dist + 0.00001f);
-	accel.y = mass * (b.y - a.y) / (dist + 0.00001f);
+	accel.x = mass * (b.x - a.x) / (dist + 0.0001f);
+	accel.y = mass * (b.y - a.y) / (dist + 0.0001f);
 
 	return  accel;
 }
@@ -254,10 +254,10 @@ __device__ float2 getallAccel(float2& pPos, Node* node, Particle* particles)
 	for (size_t i = node->startIndex; i <= node->endIndex; i++)
 	{
 
-			temp = getAccel(pPos, particles[i].pos, particles[i].mass);
-			accel.x += temp.x;
-			accel.y += temp.y;
-		
+		temp = getAccel(pPos, particles[i].pos, particles[i].mass);
+		accel.x += temp.x;
+		accel.y += temp.y;
+
 
 	}
 
@@ -361,6 +361,32 @@ __global__ void setVelSetPos(Particle* particles, NodeList* nlist, float delta) 
 
 
 }
+
+__global__ void naiveAccel(int n, Particle* particles) {
+
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+	int stride = blockDim.x * gridDim.x;
+	float2 temp;
+	float2 accel; accel.x = 0; accel.y = 0;
+	for (int i = index; i < n; i += stride)
+	{
+		for (size_t j = 0; j < n; j++)
+		{
+			temp = getAccel(particles[i].pos, particles[j].pos, particles[j].mass);
+			accel.x += temp.x;
+			accel.y += temp.y;
+
+		}
+
+		particles[i].velocity.x = particles[i].velocity.x + 0.005f * temp.x;
+		particles[i].velocity.y = particles[i].velocity.y + 0.005f * temp.y;
+		particles[i].pos.x = particles[i].pos.x + particles[i].velocity.x;
+		particles[i].pos.y = particles[i].pos.y + particles[i].velocity.y;
+	}
+
+
+}
+
 
 //void calcAccel();
 //void calcVelocity
